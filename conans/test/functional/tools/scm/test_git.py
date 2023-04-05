@@ -4,7 +4,6 @@ import re
 import textwrap
 
 import pytest
-import six
 
 from conans.test.assets.cmake import gen_cmakelists
 from conans.test.assets.sources import gen_function_cpp
@@ -14,7 +13,7 @@ from conans.test.utils.tools import TestClient
 from conans.util.files import rmdir, save_files
 
 
-@pytest.mark.skipif(six.PY2, reason="Only Py3")
+@pytest.mark.tool("git")
 class TestGitBasicCapture:
     """ base Git capture operations. They do not raise (unless errors)
     """
@@ -91,7 +90,7 @@ class TestGitBasicCapture:
             assert "pkg/0.1: DIRTY: False" in c.out
 
 
-@pytest.mark.skipif(six.PY2, reason="Only Py3")
+@pytest.mark.tool("git")
 class TestGitCaptureSCM:
     """ test the get_url_and_commit() high level method intended for SCM capturing
     into conandata.yaml
@@ -165,7 +164,7 @@ class TestGitCaptureSCM:
             assert "pkg/0.1: SCM URL: {}".format(url) in c.out
 
 
-@pytest.mark.skipif(six.PY2, reason="Only Py3")
+@pytest.mark.tool("git")
 class TestGitBasicClone:
     """ base Git cloning operations
     """
@@ -212,6 +211,7 @@ class TestGitBasicClone:
         assert c.load("source/CMakeLists.txt") == "mycmake"
 
 
+@pytest.mark.tool("git")
 class TestGitShallowClone:
     """ base Git cloning operations
     """
@@ -312,7 +312,8 @@ class TestGitCloneWithArgs:
             c.run("create .")
             assert "Remote branch foobar not found" in c.out
 
-@pytest.mark.skipif(six.PY2, reason="Only Py3")
+
+@pytest.mark.tool("git")
 class TestGitBasicSCMFlow:
     """ Build the full new SCM approach:
     - export() captures the URL and commit with get_url_and_commit(
@@ -363,7 +364,7 @@ class TestGitBasicSCMFlow:
         c.run("create .")
         assert "pkg/0.1: MYCMAKE: mycmake" in c.out
         assert "pkg/0.1: MYFILE: myheader!" in c.out
-        c.run("upload * --all -c")
+        c.run("upload * -c -r=default")
 
         # Do a change and commit, this commit will not be used by package
         save_files(path=folder, files={"src/myfile.h": "my2header2!"})
@@ -371,7 +372,7 @@ class TestGitBasicSCMFlow:
 
         # use another fresh client
         c2 = TestClient(servers=c.servers)
-        c2.run("install pkg/0.1@ --build=pkg")
+        c2.run("install --requires=pkg/0.1@ --build=pkg*")
         assert "pkg/0.1: MYCMAKE: mycmake" in c2.out
         assert "pkg/0.1: MYFILE: myheader!" in c2.out
 
@@ -398,17 +399,17 @@ class TestGitBasicSCMFlow:
         c.run("create .")
         assert "pkg/0.1: MYCMAKE: mycmake" in c.out
         assert "pkg/0.1: MYFILE: myheader!" in c.out
-        c.run("upload * --all -c")
+        c.run("upload * -c -r=default")
         rmdir(c.current_folder)  # Remove current folder to make sure things are not used from here
 
         # use another fresh client
         c2 = TestClient(servers=c.servers)
-        c2.run("install pkg/0.1@ --build=pkg")
+        c2.run("install --requires=pkg/0.1@ --build=pkg*")
         assert "pkg/0.1: MYCMAKE: mycmake" in c2.out
         assert "pkg/0.1: MYFILE: myheader!" in c2.out
 
 
-@pytest.mark.skipif(six.PY2, reason="Only Py3")
+@pytest.mark.tool("git")
 class TestGitBasicSCMFlowSubfolder:
     """ Same as above, but conanfile.py put in "conan" subfolder in the root
     """
@@ -457,7 +458,7 @@ class TestGitBasicSCMFlowSubfolder:
         c.run("create conan")
         assert "pkg/0.1: MYCMAKE: mycmake" in c.out
         assert "pkg/0.1: MYFILE: myheader!" in c.out
-        c.run("upload * --all -c")
+        c.run("upload * -c -r=default")
 
         # Do a change and commit, this commit will not be used by package
         save_files(path=folder, files={"src/myfile.h": "my2header2!"})
@@ -465,7 +466,7 @@ class TestGitBasicSCMFlowSubfolder:
 
         # use another fresh client
         c2 = TestClient(servers=c.servers)
-        c2.run("install pkg/0.1@ --build=pkg")
+        c2.run("install --requires=pkg/0.1@ --build=pkg*")
         assert "pkg/0.1: MYCMAKE: mycmake" in c2.out
         assert "pkg/0.1: MYFILE: myheader!" in c2.out
 
@@ -476,7 +477,7 @@ class TestGitBasicSCMFlowSubfolder:
         assert "conanfile.py (pkg/0.1): MYFILE-BUILD: myheader!" in c.out
 
 
-@pytest.mark.skipif(six.PY2, reason="Only Py3")
+@pytest.mark.tool("git")
 class TestGitMonorepoSCMFlow:
     """ Build the full new SCM approach:
     Same as above but with a monorepo with multiple subprojects
@@ -549,11 +550,11 @@ class TestGitMonorepoSCMFlow:
         # Exporting again sub1, gives us exactly the same revision as before
         c.run("export sub1")
         assert "CAPTURING COMMIT: {}".format(commit) in c.out
-        c.run("upload * --all -c -r=default")
+        c.run("upload * -c -r=default")
 
         # use another fresh client
         c2 = TestClient(servers=c.servers)
-        c2.run("install pkg2/0.1@ --build")
+        c2.run("install --requires=pkg2/0.1@ --build=*")
         assert "pkg1/0.1: Checkout: {}".format(commit) in c2.out
         assert "pkg1/0.1: MYCMAKE-BUILD: mycmake1!" in c2.out
         assert "pkg1/0.1: MYFILE-BUILD: myheader1!" in c2.out
@@ -728,7 +729,6 @@ class TestGitIncluded:
                     for i in included:
                         dst =  os.path.join(self.export_sources_folder, i)
                         os.makedirs(os.path.dirname(dst), exist_ok=True)
-                        print("COPYING ", i, dst)
                         shutil.copy2(i, dst)
 
                 def source(self):
@@ -744,7 +744,7 @@ class TestGitIncluded:
                 "sub/otherfile": "other"})
         c.init_git_repo()
         c.run("create .")
-        assert "pkg/0.1: SOURCES: ['.gitignore', 'myfile.other', 'sub']!!" in c.out
+        assert "pkg/0.1: SOURCES: ['.gitignore', 'conanfile.py', 'myfile.other', 'sub']!!" in c.out
         assert "pkg/0.1: SOURCES_SUB: ['otherfile']!!" in c.out
 
     def test_git_included_subfolder(self):
@@ -777,3 +777,30 @@ class TestGitIncluded:
         c.init_git_repo()
         c.run("create .")
         assert "pkg/0.1: SOURCES: ['myfile.other']!!" in c.out
+
+
+def test_capture_git_tag():
+    """
+    A local repo, without remote, will have commit, but no URL
+    """
+    c = TestClient()
+    conanfile = textwrap.dedent("""
+        from conan import ConanFile
+        from conan.tools.scm import Git
+
+        class Pkg(ConanFile):
+            name = "pkg"
+
+            def set_version(self):
+                git = Git(self, self.recipe_folder)
+                self.version = git.run("describe --tags")
+        """)
+    c.save({"conanfile.py": conanfile})
+    c.init_git_repo()
+    c.run_command("git tag 1.2")
+    c.run("install .")
+    assert "pkg/1.2" in c.out
+    c.run("create .")
+    assert "pkg/1.2" in c.out
+    c.run("install --requires=pkg/1.2")
+    assert "pkg/1.2" in c.out

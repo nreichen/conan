@@ -1,5 +1,3 @@
-import os
-
 from conan.tools.apple import to_apple_arch
 from conans.errors import ConanException
 
@@ -14,11 +12,26 @@ class XcodeBuild(object):
 
     @property
     def _verbosity(self):
-        verbosity = self._conanfile.conf.get("tools.apple.xcodebuild:verbosity", default="", check_type=str)
-        if verbosity == "quiet" or verbosity == "verbose":
-            return "-{}".format(verbosity)
-        elif verbosity:
-            raise ConanException("Value {} for 'tools.apple.xcodebuild:verbosity' is not valid".format(verbosity))
+        verbosity = self._conanfile.conf.get("tools.build:verbosity")
+        if verbosity:
+            if verbosity not in ("quiet", "error", "warning", "notice", "status", "verbose",
+                                 "normal", "debug", "v", "trace", "vv"):
+                raise ConanException(f"Value '{verbosity}' for 'tools.build:verbosity' is not valid")
+            else:
+                # quiet, nothing, verbose
+                verbosity = {"quiet": "quiet",
+                             "error": "quiet",
+                             "warning": "quiet",
+                             "notice": "quiet",
+                             "status": None,
+                             "verbose": None,
+                             "normal": None,
+                             "debug": "verbose",
+                             "v": "verbose",
+                             "trace": "verbose",
+                             "vv": "verbose"}.get(verbosity)
+                if verbosity is not None:
+                    return "-{}".format(verbosity)
         return ""
 
     @property
@@ -32,6 +45,15 @@ class XcodeBuild(object):
         return "SDKROOT={}".format(sdk) if sdk else ""
 
     def build(self, xcodeproj, target=None):
+        """
+        Call to ``xcodebuild`` to build a Xcode project.
+
+        :param xcodeproj: the *xcodeproj* file to build.
+        :param target: the target to build, in case this argument is passed to the ``build()``
+                       method it will add the ``-target`` argument to the build system call. If not passed, it
+                       will build all the targets passing the ``-alltargets`` argument instead.
+        :return: the return code for the launched ``xcodebuild`` command.
+        """
         target = "-target {}".format(target) if target else "-alltargets"
         cmd = "xcodebuild -project {} -configuration {} -arch {} " \
               "{} {} {}".format(xcodeproj, self._build_type, self._arch, self._sdkroot,
